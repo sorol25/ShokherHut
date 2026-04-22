@@ -1,0 +1,66 @@
+function stripQuotes(value) {
+  return value.replace(/^["']|['"]$/g, "");
+}
+
+function doGet(e) { 
+  Logger.log(JSON.stringify(e));
+  
+  if (typeof e.parameter === 'undefined') {
+    return ContentService.createTextOutput('No Parameters');
+  }
+
+  var sheet_id = '1FsBs-cQte2mujl4Om7n4hJDIqQ2EctE8N0Yj6k2hzbo'; // Spreadsheet ID
+  var sheet = SpreadsheetApp.openById(sheet_id).getSheetByName('Main DB');
+
+  // Check for 'Hasil' and 'CowID' parameters and process them
+  if ('Hasil' in e.parameter && 'CowID' in e.parameter) {
+    var value = stripQuotes(e.parameter['Hasil']);
+    var cowId = stripQuotes(e.parameter['CowID']);
+    var targetRow; // Default target row
+    var columnIndex = 7; // Column G (Hasil)
+
+    if (cowId === '213') {
+      targetRow = 2; // Set the target row to 2 for 'Cow ID : 213'
+    } else if (cowId === '214') {
+      targetRow = 3; // Set the target row to 3 for 'Cow ID : 214'
+    }
+
+    var targetRange = sheet.getRange(targetRow, columnIndex);
+    targetRange.setValue(value);
+  }
+
+  // Check for CowID and respond accordingly
+  if ('CowID' in e.parameter) {
+    var cowID = stripQuotes(e.parameter.CowID);
+    var data = sheet.getDataRange().getValues();
+    var cellValue;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] == cowID) { // Assuming CowID is in the first column
+        if (cowID === '213') {
+          cellValue = sheet.getRange("G2").getValue();
+        } else if (cowID === '214') {
+          cellValue = sheet.getRange("G3").getValue();
+        }
+
+        // Check the value and decide to open/close the gate
+        if (cellValue === "someValue") { // Replace "someValue" with the condition to open the gate
+          sendRequestToESP("open");
+          return ContentService.createTextOutput("y"); // 'y' means gate should open
+        }
+      }
+    }
+
+    // If CowID is not found in the sheet or the condition is not met
+    sendRequestToESP("close");
+    return ContentService.createTextOutput("n"); // 'n' means gate should remain closed
+  }
+
+  return ContentService.createTextOutput('Missing parameters');
+}
+
+function sendRequestToESP(command) {
+  var pushingBoxURL = "http://api.pushingbox.com/pushingbox?devid=vF87F5100FDF5FB8&command=" + command;
+  var response = UrlFetchApp.fetch(pushingBoxURL);
+  Logger.log(response.getContentText());
+}
